@@ -1,0 +1,23 @@
+server:
+  port: '9999'
+  error:
+    include-stacktrace: always
+  tomcat:
+    threads:
+      max: 1000
+spring:
+  datasource:
+    url: 'jdbc:postgresql://localhost:5432/hiwipay'
+    username: postgres
+    password: postgres
+  jpa:
+    properties:
+      hibernate:
+      show-sql: false
+      properties:
+        hibernate:
+          dialect: org.hibernate.dialect.PostgreSQL9Dialect
+          default_schema: user_service
+        ddl-auto: none
+        temp:
+          use_jdbc_metadata_defaults: false
