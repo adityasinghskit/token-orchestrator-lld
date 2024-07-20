@@ -15,7 +15,7 @@ public class Cron {
         tokenService.deleteExpiredTokens();
     }
 
-    @Scheduled(cron = "0/5 * * * * *")
+    @Scheduled(cron = "0/10 * * * * *")
     public void unblockTokensCron() {
         tokenService.unblockTokens();
     }

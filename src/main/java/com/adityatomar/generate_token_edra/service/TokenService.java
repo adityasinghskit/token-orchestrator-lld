@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -20,12 +22,12 @@ public class TokenService {
 
     {
         log.info("Initializing keys...");
-
-        allTokenMap.put("1", new Token("1", new Date(), null, false));
-        allTokenMap.put("2", new Token("2", new Date(), null, false));
-        allTokenMap.put("3", new Token("3", new Date(), null, false));
-        allTokenMap.put("4", new Token("4", new Date(), new Date(), true));
-        allTokenMap.put("5", new Token("5", new Date(), new Date(), true));
+        LocalDateTime time = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
+        allTokenMap.put("1", new Token("1", time, null, false));
+        allTokenMap.put("2", new Token("2", time, null, false));
+        allTokenMap.put("3", new Token("3", time, null, false));
+        allTokenMap.put("4", new Token("4", time, time, true));
+        allTokenMap.put("5", new Token("5", time, time, true));
 
         availableTokenIndex.put("1", 0);
         availableTokenIndex.put("2", 1);
@@ -47,7 +49,7 @@ public class TokenService {
         if (allTokenMap.containsKey(key)) {
             return null;
         }
-        Token newToken = new Token(key, new Date(), null, false);
+        Token newToken = new Token(key, LocalDateTime.now(ZoneId.of("Asia/Kolkata")), null, false);
         allTokenMap.put(key, newToken);
         availableToken.add(key);
         availableTokenIndex.put(key, availableToken.size() - 1);
@@ -55,9 +57,12 @@ public class TokenService {
     }
 
     public String deleteToken(String key) {
+
         if (allTokenMap.containsKey(key)) {
             allTokenMap.remove(key);
-            availableTokenIndex.remove(key);
+            if(availableTokenIndex.get(key) != null){
+                removeKeyForAvailableKeys(key);
+            }
             return key;
         }
         return null;
@@ -68,11 +73,16 @@ public class TokenService {
     }
 
     public Token getAvailableToken() {
+        int noOfAvailableTokens = availableToken.size();
+        if (noOfAvailableTokens == 0){
+            return null;
+        }
         Random random = new Random();
-        int randomIndex = (random.nextInt(availableToken.size()));
+        int randomIndex = (random.nextInt(noOfAvailableTokens));
         log.info("Random index: {}", randomIndex);
         String key = availableToken.get(randomIndex);
-        removeKeyForAvailableKeys(key, randomIndex);
+
+        removeKeyForAvailableKeys(key);
         return settingKeyAsBlocked(key);
     }
 
@@ -90,7 +100,7 @@ public class TokenService {
 
     public Token keepAliveToken(String key) {
         Token token = allTokenMap.get(key);
-        token.setCreatedAt(new Date());
+        token.setCreatedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
         allTokenMap.replace(key, token);
         return token;
     }
@@ -110,17 +120,22 @@ public class TokenService {
         return output[0];
     }
 
-    private void removeKeyForAvailableKeys(String key, int randomIndex) {
-        //removing key from availableToken List
-        removeKeyFromAvailableKeyList(key, randomIndex);
-
+    private void removeKeyForAvailableKeys(String key) {
         //removing key from availableTokenIndex Map
+        int index = availableTokenIndex.get(key);
         availableTokenIndex.remove(key);
+        //removing key from availableToken List
+        removeKeyFromAvailableKeyList(key, index);
+
+
     }
 
     private void removeKeyFromAvailableKeyList(String key, int indexOfKey) {
         String lastKey = availableToken.get(availableToken.size() - 1);
-        availableToken.remove(indexOfKey);
+        availableToken.remove(key);
+        availableToken.add(indexOfKey, lastKey);
+        availableToken.remove(availableToken.size()-1);
+        availableTokenIndex.replace(lastKey, indexOfKey);
 //        availableToken.add(indexOfKey, lastKey);
 //        availableToken.add(availableToken.size() - 1, key);
 //        availableToken.remove(availableToken.size() - 1);
@@ -128,7 +143,7 @@ public class TokenService {
 
     private Token settingKeyAsBlocked(String key) {
         Token token = allTokenMap.get(key);
-        token.setBlockedAt(new Date());
+        token.setBlockedAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
         token.setBlocked(true);
         allTokenMap.replace(key, token);
         return token;
@@ -137,15 +152,16 @@ public class TokenService {
 
     public void deleteExpiredTokens() {
         log.info("deleteExpiredTokens started");
-        Long currentTime = new Date().toInstant().getEpochSecond();
+        LocalDateTime currentTime = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
         Set<String> allKeys = allTokenMap.keySet();
         allKeys.forEach(key -> {
             Token token = allTokenMap.get(key);
-            Long expiredTime = token.getCreatedAt().toInstant().getEpochSecond() + 5 * 60;
-            if (expiredTime < currentTime) {
+            LocalDateTime expiredTime = token.getCreatedAt().plusMinutes(5);
+            if (expiredTime.isBefore(currentTime)) {
                 log.info("key: {} deleted.", key);
                 allTokenMap.remove(key);
                 Integer index = availableTokenIndex.get(key);
+                availableTokenIndex.remove(key);
                 if (index != null) {
                     removeKeyFromAvailableKeyList(key, index);
                 }
@@ -155,14 +171,14 @@ public class TokenService {
 
     public void unblockTokens() {
         log.info("unblockTokens started");
-        Long currentTime = new Date().toInstant().getEpochSecond();
+        LocalDateTime currentTime = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
         Set<String> allKeys = allTokenMap.keySet();
         allKeys.stream()
                 .filter(key -> allTokenMap.get(key).isBlocked())
                 .forEach(key -> {
                     Token token = allTokenMap.get(key);
-                    Long blockedTime = token.getCreatedAt().toInstant().getEpochSecond() + 60;
-                    if (blockedTime < currentTime) {
+                    LocalDateTime blockedTime = token.getBlockedAt().plusMinutes(1);
+                    if (blockedTime.isBefore(currentTime)) {
                         log.info("key: {} unblocked.", key);
                         token.setBlocked(false);
                         allTokenMap.replace(key, token);
